@@ -77,6 +77,17 @@ void setup() {
   pinMode(echoPin, INPUT);
   pinMode(A0, INPUT);
 
+  rst_info *resetInfo = ESP.getResetInfoPtr();
+
+  if (resetInfo->reason == REASON_DEEP_SLEEP_AWAKE) {
+    Serial.println("Ripristino da deep sleep");
+    sendWelcomeMessage = false;
+  } else {
+    // Power-on, reset esterno o crash: prima accensione "vera"
+    Serial.println("Accensione dispositivo");
+    sendWelcomeMessage = true;
+  }
+
   connectWiFi();
 }
 
@@ -163,13 +174,13 @@ void loop()
   Serial.print("Battery Voltage (mV) = ");
   Serial.println(batteryVoltage);
 
-  if (! sendWelcomeMessage) {
+  if (sendWelcomeMessage) {
     String welcomeMessage = "Sistema di monitoraggio della distanza attivo. Distanza attuale: " + String(mm) + " mm, Tensione batteria: " + String(batteryVoltage) + " mV. " +
     "Invio dati a ThingSpeak e monitoraggio allarmi attivo. Letture ogni " + String(DEEP_SLEEP_DURATION / 60000 / 1000) + " minuti. " +
     " Soglia di warning: " + String(WARNING_DISTANCE) + " mm, soglia di allarme: " + String(ALARM_DISTANCE) + " mm." +
     " Histeresi: " + String(HISTERESIS) + " mm. Indirizzo IP del dispositivo: " + WiFi.localIP().toString();
     sendTelegramMessage(welcomeMessage);
-    sendWelcomeMessage = true;
+    sendWelcomeMessage = false;
   }
 
   WiFiClient ts_client;
