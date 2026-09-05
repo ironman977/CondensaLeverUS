@@ -17,6 +17,29 @@ I had to solder RESET to GPIO16 to enable deep standby so I can use a battery fo
 
 I created a 3d model for hose adapter for my condensation drainage into the tank, this allow the existances of hose and ultrasound meter [Condensa Level Monitor](./3dmodel/Condensa%20Level%20Monitor.png)
 
+## Wiring WeMos to HC-SR04
+```
+WeMOS header                    HC-SR04 header
+
+GND  --------------------------- GND
+GND              +-------------- ECHO
+5V ---------+    |  +----------- TRIG
+3V3         +------------------- VCC
+3V3              |  |
+TX               |  |
+RX               |  |
+D8               |  |
+D7 --------------+  |
+D6 -----------------+
+D5
+D4
+D3
+D2
+D1
+A0
+```
+
+
 # Cloud to see data everywhere
 
 I used ThingSpeak because is very simple ad I used it in the past for other small projects, my device is visible at [AllertaCondensa](https://thingspeak.mathworks.com/channels/3425868)

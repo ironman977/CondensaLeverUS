@@ -6,12 +6,12 @@
 #define trigPin D6
 #define echoPin D7
 
-#define wifi_ssid "YOUR_WIFI_SSID"
-#define wifi_password "YOUR_WIFI_PASSWORD"
-#define DEEP_SLEEP_DURATION 60e6 // 60 secondi in microsecondi
+#define wifi_ssid "WIFIHOME2"
+#define wifi_password "8648002233"
+#define DEEP_SLEEP_DURATION 15*60e6 // 15 minuti in microsecondi
 #define SAMPLE_COUNT 5
-#define TELEGRAM_BOT_TOKEN "YOUR_TELEGRAM_BOT_TOKEN"
-#define CHAT_ID "YOUR_TELEGRAM_CHAT_ID"
+#define TELEGRAM_BOT_TOKEN "7912486058:AAGefrulYuR3JXMkCqzW_XuEbhqTO3-0vZY"
+#define CHAT_ID "5006717867"
 #define WARNING_DISTANCE 60 // distanza in mm per inviare l'allarme
 #define ALARM_DISTANCE 30 // distanza in mm per inviare l'allarme
 #define HISTERESIS 15 // distanza in mm per evitare falsi allarmi
@@ -36,6 +36,7 @@ bool readWarningSentFromEEPROM() {
 
 
 long durata, cm, mm;
+bool sendWelcomeMessage = false;
 
 long readBatteryVoltage() {
   int analogValue = analogRead(A0);
@@ -91,10 +92,32 @@ int misuraDurata() {
   return pulseIn(echoPin, HIGH, 30000);
 }
 
+void sendTelegramMessage(const String& message) {
+  WiFiClientSecure telegram_client;
+  telegram_client.setInsecure();
+  telegram_client.setTimeout(3000);
+
+  if (telegram_client.connect("api.telegram.org", 443)) {
+    String path = "/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage";
+    String body = "chat_id=" + String(CHAT_ID) + "&text=" + message;
+    telegram_client.print(String("POST ") + path + " HTTP/1.1\r\n" +
+                          "Host: api.telegram.org\r\n" +
+                          "Content-Type: application/x-www-form-urlencoded\r\n" +
+                          "Content-Length: " + String(body.length()) + "\r\n" +
+                          "Connection: close\r\n\r\n" + body);
+    delay(100);
+    while(telegram_client.available()) {
+      String line = telegram_client.readStringUntil('\n');
+      Serial.println(line);
+    }
+    telegram_client.stop();
+  }
+}
 
 void loop()
 {
   if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi non connesso, tentativo di riconnessione...");
     connectWiFi();
     yield();
   }
@@ -130,6 +153,7 @@ void loop()
   long cm = durata / 58;
   long mm = durata / 5.8;
   long batteryVoltage = readBatteryVoltage();
+  
 
 
   Serial.print("Cm = ");
@@ -138,6 +162,15 @@ void loop()
   Serial.println(mm);
   Serial.print("Battery Voltage (mV) = ");
   Serial.println(batteryVoltage);
+
+  if (! sendWelcomeMessage) {
+    String welcomeMessage = "Sistema di monitoraggio della distanza attivo. Distanza attuale: " + String(mm) + " mm, Tensione batteria: " + String(batteryVoltage) + " mV. " +
+    "Invio dati a ThingSpeak e monitoraggio allarmi attivo. Letture ogni " + String(DEEP_SLEEP_DURATION / 60000 / 1000) + " minuti. " +
+    " Soglia di warning: " + String(WARNING_DISTANCE) + " mm, soglia di allarme: " + String(ALARM_DISTANCE) + " mm." +
+    " Histeresi: " + String(HISTERESIS) + " mm. Indirizzo IP del dispositivo: " + WiFi.localIP().toString();
+    sendTelegramMessage(welcomeMessage);
+    sendWelcomeMessage = true;
+  }
 
   WiFiClient ts_client;
   WiFiClientSecure telegram_client;
@@ -205,27 +238,13 @@ void loop()
   }
   // Controlla se la distanza è inferiore alla soglia di allarme e invia un messaggio su Telegram se necessario senza memorizzare lo stato di warning
   if (mm < (ALARM_DISTANCE)) {
-    if (telegram_client.connect("api.telegram.org", 443)) {
-        String message = "ALARM: distanza inferiore a " + String(ALARM_DISTANCE) + " mm!";
-        String path = "/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage";
-        String body = "chat_id=" + String(CHAT_ID) + "&text=" + message;
-        telegram_client.print(String("POST ") + path + " HTTP/1.1\r\n" +
-                              "Host: api.telegram.org\r\n" +
-                              "Content-Type: application/x-www-form-urlencoded\r\n" +
-                              "Content-Length: " + String(body.length()) + "\r\n" +
-                              "Connection: close\r\n\r\n" + body);
-        delay(100);
-        while(telegram_client.available()) {
-          String line = telegram_client.readStringUntil('\n');
-          Serial.println(line);
-        }
-        telegram_client.stop();
-      }
+      String message = "ALARM: distanza inferiore a " + String(ALARM_DISTANCE) + " mm!";
+      sendTelegramMessage(message);
       Serial.println("Messaggio di allarme inviato");
   }
   
   Serial.println("vado in deep sleep");
-  ESP.deepSleep(DEEP_SLEEP_DURATION); // 60 secondi (il parametro è in microsecondi)
+  ESP.deepSleep(DEEP_SLEEP_DURATION); // 15 minuti (il parametro è in microsecondi)
 
   yield();  
 
